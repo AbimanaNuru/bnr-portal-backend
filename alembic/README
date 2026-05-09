@@ -1,0 +1,12 @@
+Generic single-database configuration.
+
+Run commands
+
+1. Create migration
+    alembic revision --autogenerate -m "migration_message"
+
+2. Upgrade
+    alembic upgrade head
+
+3. Downgrade (to previous version)
+    alembic downgrade -1

@@ -24,7 +24,8 @@ class ApplicationService:
             from_status=ApplicationStatus.DRAFT,
             to_status=ApplicationStatus.DRAFT,
             changed_by_id=applicant.id,
-            notes="Application created"
+            notes="Application created",
+            level_number=0
         )
         self.db.add(history)
         self.db.commit()
@@ -36,8 +37,7 @@ class ApplicationService:
         application_id: str,
         current_user: User,
         action: str,
-        notes: str | None = None,
-        reviewer_id: str | None = None
+        notes: str | None = None
     ) -> Application:
         application = self.db.query(Application).filter(
             Application.id == application_id
@@ -48,23 +48,17 @@ class ApplicationService:
 
         fsm = ApplicationFSM(application, self.db, current_user)
 
-        # Execute transition with enforcement
+        # Execute transition
         if action == "submit":
             fsm.submit(notes)
-        elif action == "start_review":
-            if not reviewer_id:
-                raise HTTPException(status.HTTP_400_BAD_REQUEST, "reviewer_id required")
-            fsm.start_review(reviewer_id, notes)
-        elif action == "request_information":
-            fsm.request_information(notes)
-        elif action == "resubmit":
-            fsm.resubmit(notes)
-        elif action == "complete_review":
-            fsm.complete_review(notes)
         elif action == "approve":
             fsm.approve(notes)
         elif action == "reject":
             fsm.reject(notes)
+        elif action == "request_information":
+            fsm.request_information(notes)
+        elif action == "resubmit":
+            fsm.resubmit(notes)
         else:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Unknown action: {action}")
 

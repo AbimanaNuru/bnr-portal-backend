@@ -1,10 +1,12 @@
-from fastapi import FastAPI
-from app.api.v1.endpoints import applications
+from fastapi import APIRouter
 
-app = FastAPI(title="BNR Portal API")
+from app.api.v1 import applications, users_management, auth, documents
 
-app.include_router(applications.router, prefix="/api/v1")
+app_routers = APIRouter()
 
-@app.get("/")
-def read_root():
-    return {"message": "Welcome to BNR Portal API"}
+# ── Route Inclusions ──────────────────────────────────────────────────────────
+
+app_routers.include_router(auth.router)
+app_routers.include_router(users_management.router)
+app_routers.include_router(applications.router)
+app_routers.include_router(documents.router)

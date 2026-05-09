@@ -5,7 +5,7 @@ from app.db.session import get_db
 from app.core.security.dependencies import require_permission, get_current_active_user
 from app.models import User
 from app.schemas.application import (
-    ApplicationCreate, ApplicationRead, 
+    ApplicationCreate, ApplicationRead,
     StateTransitionRequest, ApplicationUpdate
 )
 from app.services.application_service import ApplicationService
@@ -42,36 +42,17 @@ def transition_application(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Main endpoint to handle all state transitions with RBAC"""
-    
-    # Permission check based on action
-    action_map = {
-        "submit": ("application", "submit"),
-        "resubmit": ("application", "submit"),
-        "start_review": ("application", "review"),
-        "complete_review": ("application", "review"),
-        "request_information": ("application", "review"),
-        "approve": ("application", "approve"),
-        "reject": ("application", "approve"),
-    }
+    """Main endpoint to handle all state transitions using the dynamic workflow engine"""
 
-    resource, action = action_map.get(request.action, ("application", request.action))
-    
-    # Apply RBAC manually since it depends on the request body
-    rbac = RBACService(db)
-    if not rbac.has_permission(current_user, resource, action):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Permission denied: {resource}:{action}"
-        )
+    # We rely on the FSM and models to enforce role-based permissions at each level.
+    # The RBAC check here is for general access to the transition endpoint.
 
     service = ApplicationService(db)
     return service.transition_state(
         application_id=application_id,
         current_user=current_user,
         action=request.action,
-        notes=request.notes,
-        reviewer_id=request.reviewer_id
+        notes=request.notes
     )
 
 
@@ -86,14 +67,13 @@ def update_application(
     # This is a placeholder for actual update logic
     service = ApplicationService(db)
     app = service.get_application(application_id)
-    
-    # Example logic:
+
     if current_user.id != app.applicant_id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Only applicant can update")
-    
+
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(app, field, value)
-    
+
     db.commit()
     db.refresh(app)
     return app
