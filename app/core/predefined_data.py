@@ -29,7 +29,9 @@ PERMISSIONS = [
     {"name": Permission.APPLICATIONS_CREATE, "description": "Submit a new bank application", "category": "Application Operations"},
     {"name": Permission.APPLICATIONS_READ, "description": "View application details", "category": "Application Operations"},
     {"name": Permission.APPLICATIONS_UPDATE, "description": "Update application content", "category": "Application Operations"},
-    {"name": Permission.APPLICATIONS_TRANSITION, "description": "Move application through workflow states", "category": "Application Operations"},
+    {"name": Permission.APPLICATIONS_SUBMIT, "description": "Submit a draft application for review", "category": "Application Operations"},
+    {"name": Permission.APPLICATIONS_RESUBMIT, "description": "Resubmit after information is requested", "category": "Application Operations"},
+    {"name": Permission.APPLICATIONS_TRANSITION, "description": "Move application through workflow states (staff)", "category": "Application Operations"},
     
     # Document Operations
     {"name": Permission.DOCUMENTS_UPLOAD, "description": "Upload required documents", "category": "Document Operations"},
@@ -60,7 +62,8 @@ ROLE_PERMISSIONS = {
     ],
     RoleName.APPLICANT: [
         Permission.APPLICATIONS_CREATE, Permission.APPLICATIONS_READ, Permission.APPLICATIONS_UPDATE,
-        Permission.DOCUMENTS_UPLOAD, Permission.DOCUMENTS_READ
+        Permission.APPLICATIONS_SUBMIT, Permission.APPLICATIONS_RESUBMIT,
+        Permission.DOCUMENTS_UPLOAD, Permission.DOCUMENTS_READ,
     ],
 }
 

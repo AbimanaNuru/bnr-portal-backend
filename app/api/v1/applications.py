@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, status, HTTPException, Request, Query
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.core.security.dependencies import require_permission, get_current_active_user
+from app.core.security.dependencies import require_permission
 from app.core.security.permissions import Permission
 from app.models import User
 from app.schemas.application import (
@@ -38,21 +38,43 @@ def create_application(
     return {"detail": "Application created successfully", "id": str(app.id)}
 
 
-@router.get("", response_model=PaginatedResponse[ApplicationRead])
-def list_applications(
+@router.get("/my", response_model=PaginatedResponse[ApplicationRead])
+def my_applications(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     status: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_permission(Permission.APPLICATIONS_READ)),
     db: Session = Depends(get_db),
 ):
+    """Returns only the applications belonging to the authenticated applicant."""
     return ApplicationService(db).get_applications(
         current_user=current_user,
         page=page,
         page_size=page_size,
         status=status,
         search=search,
+        own_only=True,
+    )
+
+
+@router.get("", response_model=PaginatedResponse[ApplicationRead])
+def list_all_applications(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    status: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    current_user: User = Depends(require_permission(Permission.APPLICATIONS_TRANSITION)),
+    db: Session = Depends(get_db),
+):
+    """Returns all applications. Requires staff-level (APPLICATIONS_TRANSITION) permission."""
+    return ApplicationService(db).get_applications(
+        current_user=current_user,
+        page=page,
+        page_size=page_size,
+        status=status,
+        search=search,
+        own_only=False,
     )
 
 
@@ -71,7 +93,7 @@ def get_application(
 @router.get("/{application_id}/submission-check")
 def submission_check(
     application_id: str,
-    current_user: User = Depends(require_permission(Permission.APPLICATIONS_READ)),
+    current_user: User = Depends(require_permission(Permission.APPLICATIONS_SUBMIT)),
     db: Session = Depends(get_db),
 ):
     """
@@ -119,7 +141,7 @@ def submit_application(
     application_id: str,
     request: Request,
     notes: Optional[str] = None,
-    current_user: User = Depends(require_permission(Permission.APPLICATIONS_TRANSITION)),
+    current_user: User = Depends(require_permission(Permission.APPLICATIONS_SUBMIT)),
     db: Session = Depends(get_db),
 ):
     """

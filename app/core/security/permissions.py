@@ -19,6 +19,8 @@ class Permission(StrEnum):
     APPLICATIONS_READ = "applications:read"
     APPLICATIONS_CREATE = "applications:create"
     APPLICATIONS_UPDATE = "applications:update"
+    APPLICATIONS_SUBMIT = "applications:submit"
+    APPLICATIONS_RESUBMIT = "applications:resubmit"
     APPLICATIONS_TRANSITION = "applications:transition"
 
     # Documents

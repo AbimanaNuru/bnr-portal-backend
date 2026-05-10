@@ -102,11 +102,11 @@ class ApplicationService:
         page_size: int = 20,
         status: str | None = None,
         search: str | None = None,
+        own_only: bool = False,
     ) -> dict:
         query = self.db.query(Application)
 
-        is_staff = any(r.name in {"ADMIN", "REVIEWER", "APPROVER"} for r in current_user.roles)
-        if not is_staff:
+        if own_only:
             query = query.filter(Application.applicant_id == current_user.id)
 
         if status:
