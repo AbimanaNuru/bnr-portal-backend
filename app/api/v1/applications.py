@@ -44,7 +44,7 @@ def my_applications(
     page_size: int = Query(20, ge=1, le=100),
     status: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
-    current_user: User = Depends(require_permission(Permission.APPLICATIONS_READ)),
+    current_user: User = Depends(require_permission(Permission.APPLICATIONS_READ_OWN)),
     db: Session = Depends(get_db),
 ):
     """Returns only the applications belonging to the authenticated applicant."""
@@ -64,7 +64,7 @@ def list_all_applications(
     page_size: int = Query(20, ge=1, le=100),
     status: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
-    current_user: User = Depends(require_permission(Permission.APPLICATIONS_TRANSITION)),
+    current_user: User = Depends(require_permission(Permission.APPLICATIONS_READ_ALL)),
     db: Session = Depends(get_db),
 ):
     """Returns all applications. Requires staff-level (APPLICATIONS_TRANSITION) permission."""

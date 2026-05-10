@@ -26,12 +26,14 @@ PERMISSIONS = [
     {"name": Permission.WORKFLOW_MANAGE, "description": "Create or modify workflows and approval levels", "category": "Workflow Management"},
     
     # Application Operations
-    {"name": Permission.APPLICATIONS_CREATE, "description": "Submit a new bank application", "category": "Application Operations"},
-    {"name": Permission.APPLICATIONS_READ, "description": "View application details", "category": "Application Operations"},
+    {"name": Permission.APPLICATIONS_CREATE, "description": "Create a new bank application", "category": "Application Operations"},
+    {"name": Permission.APPLICATIONS_READ, "description": "View a single application's details", "category": "Application Operations"},
+    {"name": Permission.APPLICATIONS_READ_OWN, "description": "List own applications (applicants)", "category": "Application Operations"},
+    {"name": Permission.APPLICATIONS_READ_ALL, "description": "List all applications in the system (staff)", "category": "Application Operations"},
     {"name": Permission.APPLICATIONS_UPDATE, "description": "Update application content", "category": "Application Operations"},
     {"name": Permission.APPLICATIONS_SUBMIT, "description": "Submit a draft application for review", "category": "Application Operations"},
     {"name": Permission.APPLICATIONS_RESUBMIT, "description": "Resubmit after information is requested", "category": "Application Operations"},
-    {"name": Permission.APPLICATIONS_TRANSITION, "description": "Move application through workflow states (staff)", "category": "Application Operations"},
+    {"name": Permission.APPLICATIONS_TRANSITION, "description": "Approve, reject, or request information (staff)", "category": "Application Operations"},
     
     # Document Operations
     {"name": Permission.DOCUMENTS_UPLOAD, "description": "Upload required documents", "category": "Document Operations"},
@@ -46,23 +48,23 @@ ROLE_PERMISSIONS = {
     RoleName.ADMIN: [
         Permission.USERS_READ, Permission.USERS_CREATE, Permission.USERS_UPDATE, Permission.ROLES_MANAGE,
         Permission.WORKFLOW_READ, Permission.WORKFLOW_MANAGE,
-        Permission.APPLICATIONS_READ, Permission.APPLICATIONS_TRANSITION,
+        Permission.APPLICATIONS_READ, Permission.APPLICATIONS_READ_ALL, Permission.APPLICATIONS_TRANSITION,
         Permission.DOCUMENTS_READ, Permission.DOCUMENTS_MANAGE_TYPES,
-        Permission.AUDIT_READ
+        Permission.AUDIT_READ,
     ],
     RoleName.REVIEWER: [
-        Permission.APPLICATIONS_READ, Permission.APPLICATIONS_TRANSITION,
+        Permission.APPLICATIONS_READ, Permission.APPLICATIONS_READ_ALL, Permission.APPLICATIONS_TRANSITION,
         Permission.DOCUMENTS_READ,
-        Permission.WORKFLOW_READ
+        Permission.WORKFLOW_READ,
     ],
     RoleName.APPROVER: [
-        Permission.APPLICATIONS_READ, Permission.APPLICATIONS_TRANSITION,
+        Permission.APPLICATIONS_READ, Permission.APPLICATIONS_READ_ALL, Permission.APPLICATIONS_TRANSITION,
         Permission.DOCUMENTS_READ,
-        Permission.WORKFLOW_READ
+        Permission.WORKFLOW_READ,
     ],
     RoleName.APPLICANT: [
-        Permission.APPLICATIONS_CREATE, Permission.APPLICATIONS_READ, Permission.APPLICATIONS_UPDATE,
-        Permission.APPLICATIONS_SUBMIT, Permission.APPLICATIONS_RESUBMIT,
+        Permission.APPLICATIONS_CREATE, Permission.APPLICATIONS_READ, Permission.APPLICATIONS_READ_OWN,
+        Permission.APPLICATIONS_UPDATE, Permission.APPLICATIONS_SUBMIT, Permission.APPLICATIONS_RESUBMIT,
         Permission.DOCUMENTS_UPLOAD, Permission.DOCUMENTS_READ,
     ],
 }

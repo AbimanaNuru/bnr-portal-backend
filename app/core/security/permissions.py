@@ -17,6 +17,8 @@ class Permission(StrEnum):
 
     # Applications
     APPLICATIONS_READ = "applications:read"
+    APPLICATIONS_READ_OWN = "applications:read_own"
+    APPLICATIONS_READ_ALL = "applications:read_all"
     APPLICATIONS_CREATE = "applications:create"
     APPLICATIONS_UPDATE = "applications:update"
     APPLICATIONS_SUBMIT = "applications:submit"
