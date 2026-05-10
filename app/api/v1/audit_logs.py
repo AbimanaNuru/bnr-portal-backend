@@ -11,7 +11,7 @@ from app.db.session import get_db
 from app.core.security.dependencies import require_permission
 from app.core.security.permissions import Permission
 from app.models.audit_log import AuditLog
-from app.schemas.audit_log import AuditLogSchema, PaginatedResponse
+from app.schemas.audit_log import AuditLogSchema, AuditLogListSchema, PaginatedResponse
 
 router = APIRouter(prefix="/audit-logs", tags=["Audit Logs"])
 
@@ -28,7 +28,7 @@ _SORTABLE_COLUMNS = {
 
 @router.get(
     "",
-    response_model=PaginatedResponse[AuditLogSchema],
+    response_model=PaginatedResponse[AuditLogListSchema],
     summary="Get all audit logs (Admin only)",
 )
 async def get_audit_logs(

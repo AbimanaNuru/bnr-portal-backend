@@ -18,7 +18,9 @@ from app.schemas.auth import (
     RegisterResponse,
     ChangePasswordRequest,
     UserBasicInfoUpdate,
-    RefreshToken
+    RefreshToken,
+    OTPVerify,
+    OTPResend
 )
 from app.core.security.security import create_access_token, create_refresh_token
 
@@ -54,6 +56,14 @@ def login(
     db: Session = Depends(get_db)
 ):
     return AuthService(db).login(payload)
+
+@router.post("/verify-otp")
+def verify_otp(payload: OTPVerify, db: Session = Depends(get_db)):
+    return AuthService(db).verify_otp(payload.email, payload.otp)
+
+@router.post("/resend-otp")
+def resend_otp(payload: OTPResend, db: Session = Depends(get_db)):
+    return AuthService(db).resend_otp(payload.email)
 
 @router.post(
     "/staff",
@@ -127,19 +137,26 @@ def refresh_token(
         if not db_user or not db_user.is_active:
             raise HTTPException(status_code=403, detail="User not found or inactive")
 
+        active_role = db_user.roles[0].name if db_user.roles else "USER"
+        roles = [r.name for r in db_user.roles]
+
         token_data = {
             "sub": str(db_user.id),
-            "email": db_user.email,
-            "role": db_user.roles[0].name if db_user.roles else "USER"
+            "email": str(db_user.email),
+            "role": active_role
         }
 
         return TokenResponse(
             access_token=create_access_token(data=token_data),
             refresh_token=payload.refresh_token,
-            role=token_data["role"],
-            user_id=UUID(str(db_user.id)),
-            full_name=str(db_user.fullname),
-            must_change_password=bool(db_user.must_change_password)
+            token_type="bearer",
+            expires_in=86400,
+            is_first_login=bool(db_user.must_change_password),
+            email=str(db_user.email),
+            requires_role_selection=len(roles) > 1,
+            active_role=active_role,
+            roles=roles,
+            detail="Token refreshed successfully"
         )
     except JWTError:
         raise HTTPException(status_code=403, detail="Could not validate refresh token")

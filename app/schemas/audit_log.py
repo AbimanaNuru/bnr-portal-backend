@@ -5,7 +5,7 @@ from uuid import UUID
 
 T = TypeVar("T")
 
-class AuditLogSchema(BaseModel):
+class AuditLogListSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -18,7 +18,9 @@ class AuditLogSchema(BaseModel):
     resource: Optional[str] = None
     resource_id: Optional[str] = None
     status: str
-    
+    created_at: datetime
+
+class AuditLogSchema(AuditLogListSchema):
     old_data: Optional[dict] = None
     new_data: Optional[dict] = None
     extra: Optional[dict] = None
@@ -30,8 +32,6 @@ class AuditLogSchema(BaseModel):
     os: Optional[str] = None
     os_version: Optional[str] = None
     device: Optional[str] = None
-    
-    created_at: datetime
 
 class PaginatedResponse(BaseModel, Generic[T]):
     items: List[T]

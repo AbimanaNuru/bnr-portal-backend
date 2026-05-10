@@ -20,6 +20,7 @@ class EmailType(str, Enum):
     STAFF_ACCOUNT_CREATED = "staff_account_created"
     APPLICATION_SUBMITTED = "application_submitted"
     APPLICATION_STATUS_UPDATE = "application_status_update"
+    OTP_VERIFICATION = "otp_verification"
 
 # Email Schema
 class EmailSchema(BaseModel):
@@ -143,6 +144,21 @@ def get_account_verification_template(user_fullname: str, verification_link: str
     """
     return get_base_template(content)
 
+def get_otp_verification_template(user_fullname: str, otp: str) -> str:
+    content = f"""
+        <h2 style="margin-top: 0;">Your Verification Code</h2>
+        <p>Hello {{user_fullname}},</p>
+        <p>Your OTP verification code for the BNR Licensing Portal is:</p>
+        <div style="text-align: center; margin: 30px 0;">
+            <div style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #753918; padding: 15px; border: 2px dashed #753918; display: inline-block; border-radius: 8px;">
+                {{otp}}
+            </div>
+        </div>
+        <p>This code will expire in 15 minutes.</p>
+        <p>If you did not request this code, please ignore this email.</p>
+    """
+    return get_base_template(content)
+
 def get_password_reset_template(user_fullname: str, reset_link: str) -> str:
     content = f"""
         <h2 style="margin-top: 0;">Reset your password</h2>
@@ -233,6 +249,10 @@ EMAIL_TEMPLATES = {
         "template": get_application_status_update_template,
         "subject": "Important Update: Your Application Status",
     },
+    EmailType.OTP_VERIFICATION: {
+        "template": get_otp_verification_template,
+        "subject": "Your BNR Portal Verification Code",
+    },
 }
 
 # ─── Main Send Function ───────────────────────────────────────────────────────
@@ -270,7 +290,7 @@ def send_email(
         params: resend.Emails.SendParams = {
             "from": FROM_EMAIL,
             "to": [recipient_email],
-            "subject": template_config["subject"],
+            "subject": str(template_config["subject"]),
             "html": email_body,
         }
 

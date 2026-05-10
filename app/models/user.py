@@ -62,6 +62,10 @@ class User(Base):
     # BNR Specific Fields
     institution_name: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
+    # OTP Verification Fields
+    otp: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    otp_expiry: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     # Relationships
     roles: Mapped[list["Role"]] = relationship("Role", secondary=user_role, back_populates="users", lazy="selectin")
     audit_logs: Mapped[list["AuditLog"]] = relationship("AuditLog", back_populates="user")

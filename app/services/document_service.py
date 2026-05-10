@@ -189,7 +189,7 @@ class DocumentService:
         if not doc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Document not found")
 
-        file_path = UPLOAD_DIR / doc.stored_filename
+        file_path = UPLOAD_DIR / str(doc.stored_filename)
         if not file_path.exists():
             raise HTTPException(status.HTTP_404_NOT_FOUND, "File not found on disk")
 

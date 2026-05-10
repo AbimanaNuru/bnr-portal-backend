@@ -13,13 +13,16 @@ class TokenData(BaseModel):
     is_active: Optional[bool] = None
 
 class TokenResponse(BaseModel):
-    access_token: str
-    refresh_token: str
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
     token_type: str = "bearer"
-    role: str
-    user_id: UUID
-    full_name: str
-    must_change_password: bool
+    expires_in: Optional[int] = None  # seconds
+    is_first_login: bool = False
+    email: Optional[str] = None
+    requires_role_selection: bool = False
+    active_role: Optional[str] = None
+    roles: list[str] = []
+    detail: Optional[str] = None
 
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -31,18 +34,15 @@ class ApplicantRegisterRequest(BaseModel):
     """
     full_name: str = Field(..., min_length=2, max_length=255)
     email: EmailStr
-    password: str = Field(..., min_length=8, max_length=128)
     institution_name: str = Field(..., min_length=2, max_length=512,
         description="Name of the institution applying for a license")
 
-    @field_validator("password")
-    @classmethod
-    def password_complexity(cls, v: str) -> str:
-        if not any(c.isdigit() for c in v):
-            raise ValueError("Password must contain at least one number.")
-        if not any(c.isalpha() for c in v):
-            raise ValueError("Password must contain at least one letter.")
-        return v
+class OTPVerify(BaseModel):
+    email: EmailStr
+    otp: str
+
+class OTPResend(BaseModel):
+    email: EmailStr
 
 class StaffCreateRequest(BaseModel):
     """
