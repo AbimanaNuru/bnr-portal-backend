@@ -113,6 +113,73 @@ def submission_check(
     }
 
 
+@router.post("/{application_id}/submit")
+@audit(action="APPLICATION_SUBMIT", resource="application")
+def submit_application(
+    application_id: str,
+    request: Request,
+    notes: Optional[str] = None,
+    current_user: User = Depends(require_permission(Permission.APPLICATIONS_TRANSITION)),
+    db: Session = Depends(get_db),
+):
+    """
+    Validate and submit the application in one step.
+    - If all checks pass  → submits and returns 200.
+    - If anything is missing → returns 422 with a full checklist so the
+      frontend can render exactly what still needs to be done.
+    """
+    service = ApplicationService(db)
+    app = service.get_application(application_id)
+
+    if app.applicant_id != current_user.id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the applicant can submit")
+
+    is_draft = app.status.value == "DRAFT"
+    declaration_ok = bool(app.declaration_accepted)
+
+    doc_checks = [
+        {
+            "name": req.name_snapshot,
+            "required": req.is_required_snapshot,
+            "satisfied": req.is_satisfied,
+        }
+        for req in app.document_requirements
+    ]
+    missing_docs = [d["name"] for d in doc_checks if d["required"] and not d["satisfied"]]
+    documents_ok = len(missing_docs) == 0
+
+    if not (is_draft and declaration_ok and documents_ok):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "message": "Application is not ready to submit.",
+                "ready_to_submit": False,
+                "checks": {
+                    "is_draft": is_draft,
+                    "declaration_accepted": declaration_ok,
+                    "all_required_documents_uploaded": documents_ok,
+                },
+                "documents": doc_checks,
+                "missing_required_documents": missing_docs,
+            },
+        )
+
+    service.transition_state(
+        application_id=application_id,
+        current_user=current_user,
+        action="submit",
+        notes=notes,
+    )
+
+    request.state.audit_resource_id = application_id
+    request.state.audit_new = {"status": "SUBMITTED"}
+
+    return {
+        "detail": "Application submitted successfully.",
+        "application_id": application_id,
+    }
+
+
 @router.post("/{application_id}/transition")
 @audit(action="APPLICATION_TRANSITION", resource="application")
 def transition_application(
