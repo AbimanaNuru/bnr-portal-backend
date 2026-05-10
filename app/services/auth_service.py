@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import select
+from typing import Union, Any, Optional
 from fastapi import HTTPException, status
 from uuid import UUID
 
@@ -54,10 +55,10 @@ class AuthService:
             fullname=payload.full_name,
             email=payload.email,
             username=payload.email,  # Using email as username for simplicity
-            hashed_password=get_password_hash(secrets.token_urlsafe(32)), # No password provided yet
+            hashed_password=get_password_hash(payload.password),
             institution_name=payload.institution_name,
             is_active=True,
-            must_change_password=True,
+            must_change_password=False,
             otp=otp_code,
             otp_expiry=otp_expiry
         )
@@ -75,14 +76,11 @@ class AuthService:
         )
 
         return RegisterResponse(
-            user_id=UUID(str(user.id)),
             email=str(user.email),
-            full_name=str(user.fullname),
-            role="APPLICANT",
-            message="Account created successfully. An OTP has been sent to your email to complete registration."
+            detail="Account created successfully. An OTP has been sent to your email to complete registration."
         )
 
-    def login(self, payload: LoginRequest) -> TokenResponse:
+    def login(self, payload: LoginRequest) -> Union[TokenResponse, RegisterResponse]:
         user = self.db.query(User).filter(User.email == payload.email).first()
 
         if not user or not verify_password(payload.password, str(user.hashed_password)):
@@ -98,12 +96,37 @@ class AuthService:
                 detail="This account has been deactivated. Contact BNR administration.",
             )
 
+        # Only send OTP if 2FA is enabled
+        if user.is_two_factor_auth:
+            # Generate OTP for login
+            otp_code = "".join(str(secrets.randbelow(10)) for _ in range(6))
+            otp_expiry = datetime.now(timezone.utc) + timedelta(minutes=OTP_EXPIRE_MINUTES)
+
+            user.otp = otp_code
+            user.otp_expiry = otp_expiry
+            self.db.commit()
+
+            send_email(
+                email_type=EmailType.OTP_VERIFICATION,
+                recipient_email=str(user.email),
+                user_fullname=str(user.fullname),
+                otp=otp_code,
+            )
+
+            return RegisterResponse(
+                email=str(user.email),
+                detail="Login successful. An OTP has been sent to your email for verification."
+            )
+
+        # If 2FA is disabled, return tokens immediately
+        user.last_login_at = datetime.now(timezone.utc)
+        self.db.commit()
         return self._generate_token_response(user)
 
     def _generate_token_response(self, user: User) -> TokenResponse:
         active_role = user.roles[0].name if user.roles else "USER"
         roles = [r.name for r in user.roles]
-        
+
         token_data = {
             "sub": str(user.id),
             "email": str(user.email),
@@ -142,7 +165,7 @@ class AuthService:
         user.otp = None
         user.otp_expiry = None
         user.last_login_at = datetime.now(timezone.utc)
-        
+
         self.db.commit()
 
         return self._generate_token_response(user).model_dump()
@@ -154,7 +177,7 @@ class AuthService:
 
         otp_code = "".join(str(secrets.randbelow(10)) for _ in range(6))
         otp_expiry = datetime.now(timezone.utc) + timedelta(minutes=OTP_EXPIRE_MINUTES)
-        
+
         user.otp = otp_code
         user.otp_expiry = otp_expiry
         self.db.commit()
@@ -200,11 +223,8 @@ class AuthService:
         self.db.refresh(user)
 
         return RegisterResponse(
-            user_id=UUID(str(user.id)),
             email=str(user.email),
-            full_name=str(user.fullname),
-            role=payload.role_name,
-            message=f"Staff account created for {user.fullname}. They must change their password on first login."
+            detail=f"Staff account created for {user.fullname}. They must change their password on first login."
         )
 
     def change_password(self, user: User, payload: ChangePasswordRequest):

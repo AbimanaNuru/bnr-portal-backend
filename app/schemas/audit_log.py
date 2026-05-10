@@ -2,8 +2,7 @@ from datetime import datetime
 from typing import Optional, List, Generic, TypeVar
 from pydantic import BaseModel, ConfigDict
 from uuid import UUID
-
-T = TypeVar("T")
+from app.schemas.common import PaginatedResponse
 
 class AuditLogListSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -33,10 +32,4 @@ class AuditLogSchema(AuditLogListSchema):
     os_version: Optional[str] = None
     device: Optional[str] = None
 
-class PaginatedResponse(BaseModel, Generic[T]):
-    items: List[T]
-    total_count: int
-    total_pages: int
-    current_page: int
-    page_size: int
-    message: str = "Success"
+# PaginatedResponse moved to common.py

@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from fastapi import HTTPException, status
@@ -45,13 +46,13 @@ class ApplicationFSM:
             ApplicationApproval.level_id == level.id,
             ApplicationApproval.is_approved == True
         ).count()
-        return approvals_count >= level.required_approvals  # type: ignore
+        return bool(approvals_count >= level.required_approvals)  # type: ignore
 
     def _is_final_level(self, level: ApprovalLevel) -> bool:
         max_level = self.db.query(func.max(ApprovalLevel.level_number)).filter(
             ApprovalLevel.workflow_id == self.application.workflow_id
         ).scalar()
-        return level.level_number == max_level
+        return bool(level.level_number == max_level)  # type: ignore
 
     def submit(self, notes: str | None = None):
         if self.application.status != ApplicationStatus.DRAFT:
@@ -60,9 +61,29 @@ class ApplicationFSM:
         if self.current_user.id != self.application.applicant_id:
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Only applicant can submit")
 
+        if not self.application.declaration_accepted:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You must accept the declaration before submitting."
+            )
+
+        # Check document requirements
+        missing_docs = [
+            req.name_snapshot
+            for req in self.application.document_requirements
+            if req.is_required_snapshot and not req.is_satisfied
+        ]
+        if missing_docs:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Missing required documents: {', '.join(missing_docs)}"
+            )
+
         self._record_history(ApplicationStatus.SUBMITTED, notes)
         self.application.status = ApplicationStatus.SUBMITTED  # type: ignore
         self.application.current_level = 1  # type: ignore
+        self.application.submitted_at = datetime.now(timezone.utc)  # type: ignore
+        self.application.version += 1
 
     def approve(self, notes: str | None = None):
         if self.application.status not in [ApplicationStatus.SUBMITTED, ApplicationStatus.UNDER_REVIEW]:
@@ -93,6 +114,10 @@ class ApplicationFSM:
         )
         self.db.add(approval)
 
+        # Track first reviewer
+        if self.application.reviewed_by is None:
+            self.application.reviewed_by = self.current_user.id  # type: ignore
+
         # Update status to UNDER_REVIEW if it was SUBMITTED
         if self.application.status == ApplicationStatus.SUBMITTED:
             self.application.status = ApplicationStatus.UNDER_REVIEW  # type: ignore
@@ -102,10 +127,12 @@ class ApplicationFSM:
             if self._is_final_level(current_level_obj):
                 self._record_history(ApplicationStatus.APPROVED, "Final approval reached")
                 self.application.status = ApplicationStatus.APPROVED  # type: ignore
+                self.application.approved_by = self.current_user.id  # type: ignore
             else:
                 self._record_history(self.application.status, f"Level {current_level_obj.level_number} fully approved")
                 self.application.current_level += 1
-                # Status stays UNDER_REVIEW as it moves to next level
+
+        self.application.version += 1
 
     def reject(self, notes: str | None = None):
         current_level_obj = self._get_current_level()
@@ -114,6 +141,7 @@ class ApplicationFSM:
 
         self._record_history(ApplicationStatus.REJECTED, notes)
         self.application.status = ApplicationStatus.REJECTED  # type: ignore
+        self.application.version += 1
 
     def request_information(self, notes: str | None = None):
         current_level_obj = self._get_current_level()
@@ -122,6 +150,7 @@ class ApplicationFSM:
 
         self._record_history(ApplicationStatus.INFORMATION_REQUESTED, notes)
         self.application.status = ApplicationStatus.INFORMATION_REQUESTED  # type: ignore
+        self.application.version += 1
 
     def resubmit(self, notes: str | None = None):
         if self.application.status != ApplicationStatus.INFORMATION_REQUESTED:
@@ -132,3 +161,4 @@ class ApplicationFSM:
 
         self._record_history(ApplicationStatus.SUBMITTED, notes)
         self.application.status = ApplicationStatus.SUBMITTED  # type: ignore
+        self.application.version += 1

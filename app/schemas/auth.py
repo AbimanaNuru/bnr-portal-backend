@@ -34,8 +34,18 @@ class ApplicantRegisterRequest(BaseModel):
     """
     full_name: str = Field(..., min_length=2, max_length=255)
     email: EmailStr
+    password: str = Field(..., min_length=8, max_length=128)
     institution_name: str = Field(..., min_length=2, max_length=512,
         description="Name of the institution applying for a license")
+
+    @field_validator("password")
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one number.")
+        if not any(c.isalpha() for c in v):
+            raise ValueError("Password must contain at least one letter.")
+        return v
 
 class OTPVerify(BaseModel):
     email: EmailStr
@@ -58,11 +68,8 @@ class ChangePasswordRequest(BaseModel):
     new_password: str = Field(..., min_length=8)
 
 class RegisterResponse(BaseModel):
-    user_id: UUID
     email: str
-    full_name: str
-    role: str
-    message: str
+    detail: str
 
 class UserBasicInfoUpdate(BaseModel):
     fullname: Optional[str] = None

@@ -11,7 +11,7 @@ load_dotenv()
 
 # Initialize resend with API key
 resend.api_key = os.getenv("RESEND_API_KEY")
-FROM_EMAIL = os.getenv("FROM_EMAIL", "BNR Portal <no-reply@bnr.rw>")
+FROM_EMAIL = os.getenv("FROM_EMAIL", "onboarding@resend.dev")
 
 # Email Types Enum
 class EmailType(str, Enum):
@@ -147,11 +147,11 @@ def get_account_verification_template(user_fullname: str, verification_link: str
 def get_otp_verification_template(user_fullname: str, otp: str) -> str:
     content = f"""
         <h2 style="margin-top: 0;">Your Verification Code</h2>
-        <p>Hello {{user_fullname}},</p>
+        <p>Hello {user_fullname},</p>
         <p>Your OTP verification code for the BNR Licensing Portal is:</p>
         <div style="text-align: center; margin: 30px 0;">
             <div style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #753918; padding: 15px; border: 2px dashed #753918; display: inline-block; border-radius: 8px;">
-                {{otp}}
+                {otp}
             </div>
         </div>
         <p>This code will expire in 15 minutes.</p>
@@ -294,7 +294,7 @@ def send_email(
             "html": email_body,
         }
 
-        email_response: resend.Email = resend.Emails.send(params)
+        email_response: Any = resend.Emails.send(params)
         return email_response
 
     except Exception as e:

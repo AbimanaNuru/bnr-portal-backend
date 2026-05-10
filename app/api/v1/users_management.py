@@ -31,8 +31,7 @@ async def get_me(
     """
     Get current user profile with detailed context
     """
-    # Extract global roles and permissions
-    global_roles = [role.name for role in current_user.roles]
+    # Extract global permissions
     global_perms = set()
     for role in current_user.roles:
         for perm in role.permissions:
@@ -48,14 +47,10 @@ async def get_me(
             "is_active": current_user.is_active,
             "email_verified": current_user.email_verified,
             "last_login_at": current_user.last_login_at,
-            "is_two_factor_auth": current_user.is_two_factor_auth
-        },
-        "global_": {
-            "roles": list(global_roles),
+            "is_two_factor_auth": current_user.is_two_factor_auth,
             "permissions": list(global_perms)
         },
-        "contexts": [],
-        "current_context": None
+
     }
 
 # Roles & Permissions

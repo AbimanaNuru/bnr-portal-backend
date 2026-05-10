@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, status, HTTPException, Request
 from sqlalchemy.orm import Session
-from typing import Annotated
+from typing import Annotated, Union, Any
 from uuid import UUID
 
 from app.db.session import get_db
@@ -46,7 +46,7 @@ def register_applicant(
 
 @router.post(
     "/login",
-    response_model=TokenResponse,
+    response_model=Union[TokenResponse, RegisterResponse],
     summary="Log in — any role",
 )
 @audit(action="USER_LOGIN", resource="user")

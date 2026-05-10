@@ -9,7 +9,7 @@ class PermissionBase(BaseModel):
 
 class PermissionRead(PermissionBase):
     id: UUID
-    
+
     class Config:
         from_attributes = True
 
@@ -81,9 +81,9 @@ class UserMeProfile(BaseModel):
     email_verified: bool
     last_login_at: Optional[datetime] = None
     is_two_factor_auth: bool
+    permissions: List[str] = []
 
 class GlobalAccess(BaseModel):
-    roles: List[str]
     permissions: List[str]
 
 class PropertyContext(BaseModel):
@@ -107,9 +107,7 @@ class ContextItem(BaseModel):
 
 class UserMeResponse(BaseModel):
     user: UserMeProfile
-    global_: GlobalAccess = Field(..., alias="global_")
-    contexts: List[ContextItem] = []
-    current_context: Optional[str] = None
+
 
     class Config:
         allow_population_by_field_name = True
