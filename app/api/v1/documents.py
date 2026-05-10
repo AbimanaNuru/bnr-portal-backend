@@ -11,6 +11,7 @@ from app.models.application import Application
 from app.models.documents import Document
 from app.schemas.documents import (
     DocumentTypeDefinitionCreate,
+    DocumentTypeDefinitionUpdate,
     DocumentTypeDefinitionRead,
     ApplicationDocumentRequirementRead,
     DocumentRead,
@@ -41,6 +42,21 @@ def list_document_types(
     current_user: User = Depends(require_permission(Permission.DOCUMENTS_READ)),
 ):
     return DocumentService(db).list_active_document_types()
+
+
+@router.patch("/types/{type_id}", response_model=DocumentTypeDefinitionRead)
+@audit(action="DOCUMENT_TYPE_UPDATE", resource="document_type")
+def update_document_type(
+    type_id: int,
+    data: DocumentTypeDefinitionUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.DOCUMENTS_MANAGE_TYPES)),
+):
+    doc_type = DocumentService(db).update_document_type(type_id, data)
+    request.state.audit_resource_id = str(type_id)
+    request.state.audit_new = data.model_dump(exclude_unset=True)
+    return doc_type
 
 
 @router.get("/applications/{application_id}/requirements", response_model=List[ApplicationDocumentRequirementRead])

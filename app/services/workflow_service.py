@@ -53,11 +53,16 @@ class WorkflowService:
 
     def update_workflow(self, workflow_id: str, data: ApprovalWorkflowUpdate) -> ApprovalWorkflow:
         workflow = self.get_workflow(workflow_id)
-        
         update_data = data.model_dump(exclude_unset=True)
+
+        if update_data.get("is_active") is True:
+            self.db.query(ApprovalWorkflow).filter(
+                ApprovalWorkflow.id != workflow_id
+            ).update({"is_active": False}, synchronize_session=False)
+
         for key, value in update_data.items():
             setattr(workflow, key, value)
-            
+
         try:
             self.db.commit()
             self.db.refresh(workflow)
@@ -66,7 +71,7 @@ class WorkflowService:
             self.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Workflow name might already be taken."
+                detail="Workflow name might already be taken.",
             )
 
     def delete_workflow(self, workflow_id: str):

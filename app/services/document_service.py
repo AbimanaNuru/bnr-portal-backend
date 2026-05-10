@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.models.application import Application, ApplicationStatus
 from app.models.documents import ApplicationDocumentRequirement, Document, DocumentTypeDefinition
 from app.models.user import User
-from app.schemas.documents import DocumentTypeDefinitionCreate
+from app.schemas.documents import DocumentTypeDefinitionCreate, DocumentTypeDefinitionUpdate
 
 UPLOAD_DIR = Path("data/documents")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -37,6 +37,16 @@ class DocumentService:
 
     def list_active_document_types(self) -> List[DocumentTypeDefinition]:
         return self.db.query(DocumentTypeDefinition).filter(DocumentTypeDefinition.is_active == True).all()
+
+    def update_document_type(self, type_id: int, data: DocumentTypeDefinitionUpdate) -> DocumentTypeDefinition:
+        doc_type = self.db.query(DocumentTypeDefinition).filter(DocumentTypeDefinition.id == type_id).first()
+        if not doc_type:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Document type not found")
+        for field, value in data.model_dump(exclude_unset=True).items():
+            setattr(doc_type, field, value)
+        self.db.commit()
+        self.db.refresh(doc_type)
+        return doc_type
 
     def initialize_application_requirements(self, application: Application) -> List[ApplicationDocumentRequirement]:
         existing = (
