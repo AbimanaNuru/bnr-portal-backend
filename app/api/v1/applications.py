@@ -68,6 +68,51 @@ def get_application(
     return app
 
 
+@router.get("/{application_id}/submission-check")
+def submission_check(
+    application_id: str,
+    current_user: User = Depends(require_permission(Permission.APPLICATIONS_READ)),
+    db: Session = Depends(get_db),
+):
+    """
+    Dry-run submission validation. Returns a structured checklist so the
+    frontend can show exactly what is passing and what is still missing,
+    without actually submitting the application.
+    """
+    app = ApplicationService(db).get_application(application_id)
+    if app.applicant_id != current_user.id and not current_user.is_superuser:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Access denied")
+
+    # --- individual checks ---
+    is_draft = app.status.value == "DRAFT"
+    declaration_ok = bool(app.declaration_accepted)
+
+    doc_checks = [
+        {
+            "name": req.name_snapshot,
+            "required": req.is_required_snapshot,
+            "satisfied": req.is_satisfied,
+        }
+        for req in app.document_requirements
+    ]
+    missing_required_docs = [d["name"] for d in doc_checks if d["required"] and not d["satisfied"]]
+    documents_ok = len(missing_required_docs) == 0
+
+    ready = is_draft and declaration_ok and documents_ok
+
+    return {
+        "application_id": application_id,
+        "ready_to_submit": ready,
+        "checks": {
+            "is_draft": is_draft,
+            "declaration_accepted": declaration_ok,
+            "all_required_documents_uploaded": documents_ok,
+        },
+        "documents": doc_checks,
+        "missing_required_documents": missing_required_docs,
+    }
+
+
 @router.post("/{application_id}/transition")
 @audit(action="APPLICATION_TRANSITION", resource="application")
 def transition_application(
