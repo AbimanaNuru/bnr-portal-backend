@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from sqlalchemy import (
-    JSON, DateTime, ForeignKey, Index, Integer, String, Text, 
+    JSON, DateTime, ForeignKey, Index, Integer, String, Text,
     Boolean, CheckConstraint
 )
 from sqlalchemy import Enum as SQLEnum
@@ -56,10 +56,10 @@ class Application(Base):
 
     current_level: Mapped[int] = mapped_column(Integer, default=1)
     status: Mapped[ApplicationStatus] = mapped_column(
-        SQLEnum(ApplicationStatus), default=ApplicationStatus.DRAFT, nullable=False
+        SQLEnum(ApplicationStatus, native_enum=False), default=ApplicationStatus.DRAFT, nullable=False
     )
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    
+
     # Reviewer/Approver (Staff)
     reviewed_by: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("users.id"), nullable=True
@@ -109,7 +109,7 @@ class Application(Base):
     # Relationships
     reviewer: Mapped[User | None] = relationship("User", foreign_keys="Application.reviewed_by")
     approver: Mapped[User | None] = relationship("User", foreign_keys="Application.approved_by")
-    
+
     state_history: Mapped[list["ApplicationStateHistory"]] = relationship(
         "ApplicationStateHistory",
         back_populates="application",
@@ -140,6 +140,10 @@ class Application(Base):
         Index("ix_applications_status", "status"),
     )
 
+    __mapper_args__ = {
+        "version_id_col": version
+    }
+
     def __repr__(self) -> str:
         return (
             f"<Application id={self.id} "
@@ -157,8 +161,8 @@ class ApplicationStateHistory(Base):
         ForeignKey("applications.id", ondelete="CASCADE"), nullable=False
     )
 
-    from_status: Mapped[ApplicationStatus] = mapped_column(SQLEnum(ApplicationStatus))
-    to_status: Mapped[ApplicationStatus] = mapped_column(SQLEnum(ApplicationStatus))
+    from_status: Mapped[ApplicationStatus] = mapped_column(SQLEnum(ApplicationStatus, native_enum=False))
+    to_status: Mapped[ApplicationStatus] = mapped_column(SQLEnum(ApplicationStatus, native_enum=False))
 
     changed_by_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
     changed_by: Mapped["User"] = relationship("User", foreign_keys=[changed_by_id])

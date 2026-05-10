@@ -17,6 +17,7 @@ class ApplicationFSM:
         self.current_user = current_user
 
     def _record_history(self, to_status: ApplicationStatus, notes: str | None = None):
+        print(f"DEBUG: Recording history: {self.application.status} -> {to_status}")
         self.db.add(
             ApplicationStateHistory(
                 application_id=self.application.id,
@@ -79,7 +80,6 @@ class ApplicationFSM:
         self.application.status = ApplicationStatus.SUBMITTED  # type: ignore
         self.application.current_level = 1  # type: ignore
         self.application.submitted_at = datetime.now(timezone.utc)  # type: ignore
-        self.application.version += 1
 
     def approve(self, notes: str | None = None):
         if self.application.status not in (ApplicationStatus.SUBMITTED, ApplicationStatus.UNDER_REVIEW):
@@ -123,7 +123,6 @@ class ApplicationFSM:
                 self._record_history(self.application.status, f"Level {level.level_number} approved")
                 self.application.current_level += 1
 
-        self.application.version += 1
 
     def reject(self, notes: str | None = None):
         level = self._get_current_level()
@@ -132,7 +131,6 @@ class ApplicationFSM:
 
         self._record_history(ApplicationStatus.REJECTED, notes)
         self.application.status = ApplicationStatus.REJECTED  # type: ignore
-        self.application.version += 1
 
     def request_information(self, notes: str | None = None):
         level = self._get_current_level()
@@ -141,7 +139,6 @@ class ApplicationFSM:
 
         self._record_history(ApplicationStatus.INFORMATION_REQUESTED, notes)
         self.application.status = ApplicationStatus.INFORMATION_REQUESTED  # type: ignore
-        self.application.version += 1
 
     def resubmit(self, notes: str | None = None):
         if self.application.status != ApplicationStatus.INFORMATION_REQUESTED:
@@ -151,4 +148,3 @@ class ApplicationFSM:
 
         self._record_history(ApplicationStatus.SUBMITTED, notes)
         self.application.status = ApplicationStatus.SUBMITTED  # type: ignore
-        self.application.version += 1
