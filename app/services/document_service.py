@@ -34,10 +34,8 @@ class DocumentService:
         doc_type = DocumentTypeDefinition(
             name=schema.name,
             description=schema.description,
-            institution_type=schema.institution_type,
             is_required=schema.is_required,
             is_active=schema.is_active,
-            display_order=schema.display_order,
             created_by_id=current_user.id
         )
         self.db.add(doc_type)
@@ -45,15 +43,9 @@ class DocumentService:
         self.db.refresh(doc_type)
         return doc_type
 
-    def list_active_document_types(self, institution_type: Optional[str] = None) -> List[DocumentTypeDefinition]:
+    def list_active_document_types(self) -> List[DocumentTypeDefinition]:
         query = self.db.query(DocumentTypeDefinition).filter(DocumentTypeDefinition.is_active == True)
-        if institution_type:
-            # Include docs for ALL institutions (None) and for this specific institution
-            query = query.filter(
-                (DocumentTypeDefinition.institution_type == None) |
-                (DocumentTypeDefinition.institution_type == institution_type)
-            )
-        return query.order_by(DocumentTypeDefinition.display_order).all()
+        return query.all()
 
     # ---------------------------------------------------------
     # Application Requirements Snapshot
@@ -74,7 +66,7 @@ class DocumentService:
                 ApplicationDocumentRequirement.application_id == application.id
             ).all()
 
-        active_types = self.list_active_document_types(application.institution_type)
+        active_types = self.list_active_document_types()
         requirements = []
 
         for dt in active_types:

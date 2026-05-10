@@ -1,7 +1,11 @@
 from datetime import datetime
 from uuid import uuid4
+from typing import TYPE_CHECKING
 from sqlalchemy import String, ForeignKey, Table, Column, Boolean, DateTime, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+if TYPE_CHECKING:
+    from app.models.audit_log import AuditLog
 from app.db.base import Base
 
 # Junction tables
@@ -17,7 +21,6 @@ role_permission = Table("role_permission", Base.metadata,
     extend_existing=True
 )
 
-
 class PermissionCategory(Base):
     """
     Groups permissions into logical categories (e.g. 'Property Management', 'User Management').
@@ -31,8 +34,6 @@ class PermissionCategory(Base):
     permissions: Mapped[list["Permission"]] = relationship(
         back_populates="category", cascade="all, delete-orphan"
     )
-
-
 
 class User(Base):
     __tablename__ = "users"
@@ -52,14 +53,18 @@ class User(Base):
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), server_default=func.now(), onupdate=func.now())
 
     # Advanced Auth Fields
     is_two_factor_auth: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    
+    # BNR Specific Fields
+    institution_name: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
+    # Relationships
     roles: Mapped[list["Role"]] = relationship("Role", secondary=user_role, back_populates="users", lazy="selectin")
-
-
+    audit_logs: Mapped[list["AuditLog"]] = relationship("AuditLog", back_populates="user")
 
 class Role(Base):
     __tablename__ = "roles"
@@ -70,7 +75,6 @@ class Role(Base):
 
     users: Mapped[list[User]] = relationship("User", secondary=user_role, back_populates="roles", lazy="selectin")
     permissions: Mapped[list["Permission"]] = relationship("Permission", secondary=role_permission, back_populates="roles", lazy="selectin")
-
 
 class Permission(Base):
     __tablename__ = "permissions"

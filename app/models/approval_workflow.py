@@ -12,15 +12,12 @@ from app.models.user import Role, User
 if TYPE_CHECKING:
     from app.models.application import Application
 
-
 # Many-to-Many: Level <-> Roles (who can approve at this level)
-level_role = Table(
-    "approval_level_role", Base.metadata,
-    Column("level_id", String(36), ForeignKey("approval_levels.id", ondelete="CASCADE"), primary_key=True),
-    Column("role_id", String(36), ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True),
-    extend_existing=True
-)
-
+class ApprovalLevelRole(Base):
+    __tablename__ = "approval_level_role"
+    
+    level_id: Mapped[str] = mapped_column(String(36), ForeignKey("approval_levels.id", ondelete="CASCADE"), primary_key=True)
+    role_id: Mapped[str] = mapped_column(String(36), ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True)
 
 class ApprovalWorkflow(Base):
     __tablename__ = "approval_workflows"
@@ -37,7 +34,6 @@ class ApprovalWorkflow(Base):
         order_by="ApprovalLevel.level_number"
     )
 
-
 class ApprovalLevel(Base):
     __tablename__ = "approval_levels"
 
@@ -52,12 +48,11 @@ class ApprovalLevel(Base):
     workflow: Mapped[ApprovalWorkflow] = relationship("ApprovalWorkflow", back_populates="levels")
     
     # Who can approve at this level
-    roles: Mapped[list[Role]] = relationship("Role", secondary=level_role)
+    roles: Mapped[list[Role]] = relationship("Role", secondary="approval_level_role")
 
     __table_args__ = (
         Index("ix_approval_level_workflow", "workflow_id", "level_number", unique=True),
     )
-
 
 class ApplicationApproval(Base):
     """Tracks who approved what and at which level"""

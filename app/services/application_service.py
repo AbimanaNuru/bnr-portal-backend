@@ -5,7 +5,6 @@ from app.models import (
 )
 from app.services.application_fsm import ApplicationFSM
 
-
 class ApplicationService:
     def __init__(self, db: Session):
         self.db = db

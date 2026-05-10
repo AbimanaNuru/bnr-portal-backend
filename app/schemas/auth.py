@@ -1,26 +1,73 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional
+from uuid import UUID
 
 class Token(BaseModel):
     access_token: str
     refresh_token: str
-    token_type: str
+    token_type: str = "bearer"
 
 class TokenData(BaseModel):
-    username: str | None = None
-    user_id: str | None = None
-    is_active: bool | None = None
+    username: Optional[str] = None
+    user_id: Optional[str] = None
+    is_active: Optional[bool] = None
 
-class RefreshToken(BaseModel):
+class TokenResponse(BaseModel):
+    access_token: str
     refresh_token: str
-
-class UserRegister(BaseModel):
-    email: EmailStr
-    username: str
-    fullname: str
-    password: str
-    phone_number: Optional[str] = None
+    token_type: str = "bearer"
+    role: str
+    user_id: UUID
+    full_name: str
+    must_change_password: bool
 
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+class ApplicantRegisterRequest(BaseModel):
+    """
+    Public registration — applicant only.
+    """
+    full_name: str = Field(..., min_length=2, max_length=255)
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=128)
+    institution_name: str = Field(..., min_length=2, max_length=512,
+        description="Name of the institution applying for a license")
+
+    @field_validator("password")
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one number.")
+        if not any(c.isalpha() for c in v):
+            raise ValueError("Password must contain at least one letter.")
+        return v
+
+class StaffCreateRequest(BaseModel):
+    """
+    Admin-only staff provisioning.
+    """
+    full_name: str = Field(..., min_length=2, max_length=255)
+    email: EmailStr
+    temporary_password: str = Field(..., min_length=8, max_length=128)
+    role_name: str = Field(..., description="REVIEWER | APPROVER | ADMIN")
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=8)
+
+class RegisterResponse(BaseModel):
+    user_id: UUID
+    email: str
+    full_name: str
+    role: str
+    message: str
+
+class UserBasicInfoUpdate(BaseModel):
+    fullname: Optional[str] = None
+    phone_number: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+class RefreshToken(BaseModel):
+    refresh_token: str

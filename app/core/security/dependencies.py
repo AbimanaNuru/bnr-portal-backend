@@ -1,5 +1,5 @@
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
 
@@ -9,11 +9,15 @@ from app.services.rbac_service import RBACService
 from app.core.security.security import SECRET_KEY, ALGORITHM
 from app.schemas.auth import TokenData
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
+security_scheme = HTTPBearer()
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+async def get_current_user(
+    auth: HTTPAuthorizationCredentials = Depends(security_scheme),
+    db: Session = Depends(get_db)
+) -> User:
+    token = auth.credentials
     credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
+        status_code=status.HTTP_403_FORBIDDEN,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
@@ -25,7 +29,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         token_data = TokenData(user_id=user_id)
     except JWTError:
         raise credentials_exception
-        
+
     user = db.query(User).filter(User.id == token_data.user_id).first()
     if user is None:
         raise credentials_exception
@@ -33,23 +37,23 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
 
 async def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
     if not current_user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user")
     return current_user
 
-def require_permission(resource: str, action: str):
+def require_permission(permission_name: str):
     """
-    Senior-level permission dependency
-    Example: require_permission("application", "approve")
+    Dependency to check for a specific permission by name.
+    Usage: Depends(require_permission(Permission.USERS_READ))
     """
     def permission_dependency(
         current_user: User = Depends(get_current_active_user),
         db: Session = Depends(get_db)
     ):
         rbac = RBACService(db)
-        if not rbac.has_permission(current_user, resource, action):
+        if not rbac.has_permission_by_name(current_user, permission_name):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Permission denied: {resource}:{action}"
+                detail=f"Permission denied: {permission_name}"
             )
         return current_user
     return permission_dependency

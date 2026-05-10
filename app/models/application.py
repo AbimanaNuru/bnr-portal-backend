@@ -17,7 +17,6 @@ if TYPE_CHECKING:
     from app.models.approval_workflow import ApplicationApproval, ApprovalWorkflow
     from app.models.documents import Document, ApplicationDocumentRequirement
 
-
 class ApplicationStatus(str, Enum):
     DRAFT = "DRAFT"
     SUBMITTED = "SUBMITTED"
@@ -32,7 +31,6 @@ class InstitutionType(str, Enum):
     MICROFINANCE = "MICROFINANCE"
     FOREX_BUREAU = "FOREX_BUREAU"
     PAYMENT_PROVIDER = "PAYMENT_PROVIDER"
-
 
 class Application(Base):
     __tablename__ = "applications"
@@ -72,7 +70,7 @@ class Application(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), onupdate=func.now()
+        DateTime(timezone=True), default=func.now(), server_default=func.now(), onupdate=func.now()
     )
 
     # Relationships
@@ -96,7 +94,6 @@ class Application(Base):
         back_populates="application",
         cascade="all, delete-orphan",
     )
-
 
 class ApplicationStateHistory(Base):
     __tablename__ = "application_state_history"

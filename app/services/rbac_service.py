@@ -1,7 +1,6 @@
 from sqlalchemy.orm import Session
 from app.models import User
 
-
 class RBACService:
     def __init__(self, db: Session):
         self.db = db
@@ -14,6 +13,16 @@ class RBACService:
             for permission in role.permissions:
                 if (permission.resource == resource and 
                     permission.action == action):
+                    return True
+        return False
+
+    def has_permission_by_name(self, user: User, permission_name: str) -> bool:
+        if user.is_superuser:
+            return True
+
+        for role in user.roles:
+            for permission in role.permissions:
+                if permission.name == permission_name:
                     return True
         return False
 

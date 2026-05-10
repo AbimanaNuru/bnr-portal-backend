@@ -3,8 +3,6 @@ from uuid import UUID
 from typing import List, Optional, Any
 from pydantic import BaseModel, EmailStr, Field
 
-# ─── Basic Component Schemas ──────────────────────────────────────────────────
-
 class PermissionBase(BaseModel):
     name: str
     description: Optional[str] = None
@@ -34,8 +32,6 @@ class RoleRead(RoleBase):
 
     class Config:
         from_attributes = True
-
-# ─── User Schemas ─────────────────────────────────────────────────────────────
 
 class UserBase(BaseModel):
     email: EmailStr
@@ -67,8 +63,6 @@ class UserUpdate(BaseModel):
 class UserStatusUpdate(BaseModel):
     is_active: bool
 
-# ─── Paginated Response ───────────────────────────────────────────────────────
-
 class UserListResponse(BaseModel):
     success: bool = True
     data: List[UserRead]
@@ -76,8 +70,6 @@ class UserListResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
-
-# ─── ME Endpoint Schemas ──────────────────────────────────────────────────────
 
 class UserMeProfile(BaseModel):
     id: UUID
@@ -121,8 +113,6 @@ class UserMeResponse(BaseModel):
 
     class Config:
         allow_population_by_field_name = True
-
-# ─── Request Schemas ──────────────────────────────────────────────────────────
 
 class RoleAssignRequest(BaseModel):
     role_id: UUID

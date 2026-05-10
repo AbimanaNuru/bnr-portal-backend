@@ -5,7 +5,6 @@ from uuid import UUID
 
 from app.models import ApplicationStatus
 
-
 class UserRead(BaseModel):
     id: str
     email: str
@@ -16,22 +15,18 @@ class UserRead(BaseModel):
     class Config:
         from_attributes = True
 
-
 class ApplicationBase(BaseModel):
     title: str = Field(..., min_length=5, max_length=255)
     description: Optional[str] = Field(None, max_length=2000)
     extra_metadata: Optional[Dict[str, Any]] = None
 
-
 class ApplicationCreate(ApplicationBase):
     """Used when applicant creates a new application"""
     workflow_id: str
 
-
 class ApplicationUpdate(ApplicationBase):
     """Used for updates (especially when information is requested)"""
     pass
-
 
 class ApprovalLevelRead(BaseModel):
     id: str
@@ -41,7 +36,6 @@ class ApprovalLevelRead(BaseModel):
 
     class Config:
         from_attributes = True
-
 
 class ApplicationApprovalRead(BaseModel):
     id: str
@@ -53,7 +47,6 @@ class ApplicationApprovalRead(BaseModel):
 
     class Config:
         from_attributes = True
-
 
 class ApplicationRead(ApplicationBase):
     id: str
@@ -71,12 +64,10 @@ class ApplicationRead(ApplicationBase):
     class Config:
         from_attributes = True
 
-
 class StateTransitionRequest(BaseModel):
     """Request body for changing application state"""
     action: str = Field(..., description="e.g. submit, approve, reject, request_information")
     notes: Optional[str] = Field(None, max_length=1000)
-
 
 class ApplicationStateHistoryRead(BaseModel):
     id: str

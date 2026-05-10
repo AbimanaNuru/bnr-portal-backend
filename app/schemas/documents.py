@@ -9,19 +9,17 @@ from pydantic import BaseModel, Field
 class DocumentTypeDefinitionBase(BaseModel):
     name: str = Field(..., max_length=255)
     description: str = Field(default="")
-    institution_type: Optional[str] = Field(None, max_length=100)
     is_required: bool = Field(default=True)
     is_active: bool = Field(default=True)
-    display_order: int = Field(default=0)
 
 class DocumentTypeDefinitionCreate(DocumentTypeDefinitionBase):
     pass
 
-class DocumentTypeDefinitionUpdate(DocumentTypeDefinitionBase):
-    name: Optional[str] = Field(None, max_length=255)
+class DocumentTypeDefinitionUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
     is_required: Optional[bool] = None
     is_active: Optional[bool] = None
-    display_order: Optional[int] = None
 
 class DocumentTypeDefinitionRead(DocumentTypeDefinitionBase):
     id: int
