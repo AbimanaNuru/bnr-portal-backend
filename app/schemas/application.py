@@ -87,10 +87,11 @@ class ApplicationRead(ApplicationBase):
 
     applicant: Optional[UserRead] = None
     approvals: list[ApplicationApprovalRead] = []
+    available_actions: list[str] = []
 
 
 class StateTransitionRequest(BaseModel):
-    action: str = Field(..., description="submit | approve | reject | request_information | resubmit")
+    action: str = Field(..., description="submit | approve | reject | request_information | request_info | resubmit | start_review | complete_review")
     notes: Optional[str] = Field(None, max_length=1000)
     version: int
 

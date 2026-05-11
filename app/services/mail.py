@@ -4,7 +4,10 @@ from dotenv import load_dotenv
 import os
 from enum import Enum
 import resend
+import logging
 import inspect
+
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -298,11 +301,9 @@ def send_email(
         return email_response
 
     except Exception as e:
-        # In production, you might want to log this to Sentry/CloudWatch
-        print(f"FAILED TO SEND EMAIL: {str(e)}")
+        logger.error(f"FAILED TO SEND EMAIL: {str(e)}")
         raise Exception(f"Error sending email: {str(e)}")
 
-# Backward compatibility util
 async def send_email_util(email_data: EmailSchema):
     """Simple utility to send raw HTML emails via Resend"""
     try:
@@ -314,4 +315,5 @@ async def send_email_util(email_data: EmailSchema):
         }
         return resend.Emails.send(params)
     except Exception as e:
+        logger.error(f"Error sending email: {str(e)}")
         raise Exception(f"Error sending email: {str(e)}")

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, status, HTTPException, Request, Query
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.core.security.dependencies import require_permission
+from app.core.security.dependencies import require_permission, require_any_permission
 from app.core.security.permissions import Permission
 from app.models import User
 from app.schemas.application import (
@@ -12,8 +12,9 @@ from app.schemas.application import (
 )
 from app.schemas.common import PaginatedResponse
 from app.services.application_service import ApplicationService
+from app.services.rbac_service import RBACService
 from app.services.audit_service import audit
-
+from app.services.application_fsm import ApplicationFSM
 router = APIRouter(prefix="/applications", tags=["Applications"])
 
 
@@ -85,15 +86,26 @@ def get_application(
     db: Session = Depends(get_db),
 ):
     app = ApplicationService(db).get_application(application_id)
-    if app.applicant_id != current_user.id and not current_user.is_superuser:
+    rbac = RBACService(db)
+
+    is_owner = app.applicant_id == current_user.id
+    has_read_all = rbac.has_permission_by_name(current_user, Permission.APPLICATIONS_READ_ALL)
+
+    if not (is_owner or current_user.is_superuser or has_read_all):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Access denied")
+
+    # Compute available actions for the current user
+
+    fsm = ApplicationFSM(app, db, current_user)
+    app.available_actions = fsm.get_available_actions()
+
     return app
 
 
 @router.get("/{application_id}/submission-check")
 def submission_check(
     application_id: str,
-    current_user: User = Depends(require_permission(Permission.APPLICATIONS_SUBMIT)),
+    current_user: User = Depends(require_permission(Permission.APPLICATIONS_READ)),
     db: Session = Depends(get_db),
 ):
     """
@@ -102,7 +114,12 @@ def submission_check(
     without actually submitting the application.
     """
     app = ApplicationService(db).get_application(application_id)
-    if app.applicant_id != current_user.id and not current_user.is_superuser:
+    rbac = RBACService(db)
+
+    is_owner = app.applicant_id == current_user.id
+    has_read_all = rbac.has_permission_by_name(current_user, Permission.APPLICATIONS_READ_ALL)
+
+    if not (is_owner or current_user.is_superuser or has_read_all):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Access denied")
 
     # --- individual checks ---
@@ -201,14 +218,17 @@ def submit_application(
         "application_id": application_id,
     }
 
-
 @router.post("/{application_id}/transition")
 @audit(action="APPLICATION_TRANSITION", resource="application")
 def transition_application(
     application_id: str,
     request_data: StateTransitionRequest,
     request: Request,
-    current_user: User = Depends(require_permission(Permission.APPLICATIONS_TRANSITION)),
+    current_user: User = Depends(require_any_permission([
+        Permission.APPLICATIONS_TRANSITION,
+        Permission.APPLICATIONS_SUBMIT,
+        Permission.APPLICATIONS_RESUBMIT,
+    ])),
     db: Session = Depends(get_db),
 ):
     request.state.audit_resource_id = application_id
@@ -235,6 +255,9 @@ def update_application(
 ):
     service = ApplicationService(db)
     app = service.get_application(application_id)
+
+    if app.applicant_id != current_user.id and not current_user.is_superuser:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the applicant can update their application")
 
     if app.version != data.version:
         raise HTTPException(
