@@ -12,6 +12,7 @@ A production-ready, senior-level backend implementation for the BNR Bank Licensi
 
 ### ⚙️ Workflow Engine
 - **Application State Machine**: Managed lifecycle (DRAFT → SUBMITTED → UNDER_REVIEW → REVIEWED → APPROVED/REJECTED).
+- **Visual Logic**: [Workflow Diagrams & State Transitions](https://drive.google.com/file/d/1SoyiUrbBc6Zw-22buTkmtRWMqsafY9F7/view?usp=sharing)
 - **Multi-Level Approval**: Support for configurable workflows with multiple review and decision stages.
 - **Audit Logging**: Comprehensive, automated tracking of all state transitions and sensitive API actions.
 
