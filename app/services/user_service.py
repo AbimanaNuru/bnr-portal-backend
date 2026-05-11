@@ -1,9 +1,14 @@
+import os
 from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, func
 from app.models.user import User, Role, Permission, PermissionCategory
 from app.schemas.user_management import UserStatusUpdate
 from datetime import datetime
+import secrets
+import string
+from app.core.security.security import get_password_hash
+from app.services.mail import send_email, EmailType
 
 class UserService:
     def __init__(self, db: Session):
@@ -113,3 +118,83 @@ class UserService:
                 self.db.commit()
             return True
         return False
+
+    def invite_user(self, email: str, fullname: str, role_id: str) -> User:
+        # Check if user already exists
+        existing = self.db.query(User).filter(User.email == email).first()
+        if existing:
+            if existing.deleted_at:
+                # Reactivate if previously deleted
+                existing.deleted_at = None
+                existing.is_active = True
+                existing.fullname = fullname
+            else:
+                raise ValueError(f"User with email {email} already exists")
+            user = existing
+        else:
+            # Generate random password
+            temp_password = self._generate_random_password()
+            
+            user = User(
+                email=email,
+                fullname=fullname,
+                username=email, # Use email as username
+                hashed_password=get_password_hash(temp_password),
+                is_active=True,
+                email_verified=True,
+                must_change_password=True
+            )
+            self.db.add(user)
+            self.db.flush()
+
+        # Assign role
+        role = self.db.query(Role).filter(Role.id == role_id).first()
+        if not role:
+            raise ValueError(f"Role with ID {role_id} not found")
+        
+        if role not in user.roles:
+            user.roles.append(role)
+        
+        self.db.commit()
+        self.db.refresh(user)
+
+        # Send invitation email
+        send_email(
+            email_type=EmailType.STAFF_ACCOUNT_CREATED,
+            recipient_email=email,
+            user_fullname=fullname,
+            temporary_password=temp_password if not existing else "[Check previous email]",
+            login_link=f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/auth/login", # Configurable
+            role=str(role.name)
+        )
+        
+        return user
+
+    def re_invite_user(self, user_id: str) -> bool:
+        user = self.get_user_by_id(user_id)
+        if not user:
+            return False
+        
+        # Generate new temporary password
+        temp_password = self._generate_random_password()
+        user.hashed_password = get_password_hash(temp_password)
+        user.must_change_password = True
+        
+        role_name = user.roles[0].name if user.roles else "Staff"
+        
+        self.db.commit()
+
+        # Resend email
+        send_email(
+            email_type=EmailType.STAFF_ACCOUNT_CREATED,
+            recipient_email=str(user.email),
+            user_fullname=str(user.fullname),
+            temporary_password=temp_password,
+            login_link=f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/auth/login",
+            role=str(role_name)
+        )
+        return True
+
+    def _generate_random_password(self, length: int = 12) -> str:
+        alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+        return ''.join(secrets.choice(alphabet) for _ in range(length))

@@ -42,6 +42,7 @@ class ApplicationDocumentRequirementRead(BaseModel):
     is_required_snapshot: bool
     is_satisfied: bool
     satisfied_at: Optional[datetime]
+    latest_document_id: Optional[int] = None
 
     class Config:
         from_attributes = True

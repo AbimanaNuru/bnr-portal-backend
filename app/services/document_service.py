@@ -77,9 +77,33 @@ class DocumentService:
         return requirements
 
     def get_application_requirements(self, application_id: str) -> List[ApplicationDocumentRequirement]:
-        return (
+        requirements = (
             self.db.query(ApplicationDocumentRequirement)
             .filter(ApplicationDocumentRequirement.application_id == application_id)
+            .all()
+        )
+        
+        # Attach latest_document_id for convenience
+        for req in requirements:
+            latest_doc = (
+                self.db.query(Document)
+                .filter(
+                    Document.application_id == application_id,
+                    Document.document_type_id == req.document_type_id,
+                    Document.is_latest == True
+                )
+                .first()
+            )
+            if latest_doc:
+                req.latest_document_id = latest_doc.id # type: ignore
+        
+        return requirements
+
+    def list_application_documents(self, application_id: str) -> List[Document]:
+        return (
+            self.db.query(Document)
+            .filter(Document.application_id == application_id)
+            .order_by(Document.document_type_id, Document.version_number.desc())
             .all()
         )
 

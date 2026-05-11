@@ -71,6 +71,18 @@ def get_application_requirements(
     if app.applicant_id != current_user.id and not current_user.is_superuser:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Access denied")
     return DocumentService(db).get_application_requirements(application_id)
+@router.get("/applications/{application_id}", response_model=List[DocumentRead])
+def list_application_documents(
+    application_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.DOCUMENTS_READ)),
+):
+    app = db.query(Application).filter(Application.id == application_id).first()
+    if not app:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Application not found")
+    if app.applicant_id != current_user.id and not current_user.is_superuser:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Access denied")
+    return DocumentService(db).list_application_documents(application_id)
 
 
 @router.post("/applications/{application_id}/upload")

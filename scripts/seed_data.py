@@ -58,12 +58,13 @@ def seed_data():
 
         # 3. Seed Roles and Assign Permissions
         for role_name, perms_list in ROLE_PERMISSIONS.items():
-            role = db.query(Role).filter(Role.name == role_name.value).first()
+            name_str = role_name.value if hasattr(role_name, "value") else str(role_name)
+            role = db.query(Role).filter(Role.name == name_str).first()
             if not role:
                 role = Role(
                     id=str(uuid4()),
-                    name=role_name.value,
-                    description=f"Standard {role_name.value} role for the portal"
+                    name=name_str,
+                    description=f"Standard {name_str} role for the portal"
                 )
                 db.add(role)
                 db.flush()
@@ -77,29 +78,75 @@ def seed_data():
 
             print(f"  🛡️ Assigned {len(perms_list)} permissions to {role_name.value}")
 
-        # 4. Seed Default Admin User
-        admin_email = "admin@bnr.rw"
-        admin_user = db.query(User).filter(User.email == admin_email).first()
+        # 4. Seed Specific Development Accounts
+        dev_accounts = [
+            {
+                "email": "applicant@bnr-dev.rw",
+                "password": "applicant123",
+                "fullname": "BNR Dev Applicant",
+                "role": RoleName.APPLICANT,
+                "is_superuser": False
+            },
+            {
+                "email": "reviewer@bnr-dev.rw",
+                "password": "reviewer123",
+                "fullname": "BNR Dev Reviewer",
+                "role": RoleName.REVIEWER,
+                "is_superuser": False
+            },
+            {
+                "email": "approver@bnr-dev.rw",
+                "password": "approver123",
+                "fullname": "BNR Dev Approver",
+                "role": RoleName.APPROVER,
+                "is_superuser": False
+            },
+            {
+                "email": "admin@bnr-dev.rw",
+                "password": "admin123",
+                "fullname": "BNR Dev Administrator",
+                "role": RoleName.ADMIN,
+                "is_superuser": True
+            }
+        ]
+
+        for acc in dev_accounts:
+            user = db.query(User).filter(User.email == acc["email"]).first()
+            if not user:
+                user = User(
+                    id=str(uuid4()),
+                    email=acc["email"],
+                    username=acc["email"], # Use email to avoid unique constraint issues
+                    fullname=acc["fullname"],
+                    hashed_password=get_password_hash(acc["password"]),
+                    is_active=True,
+                    is_superuser=acc["is_superuser"],
+                    email_verified=True,
+                    must_change_password=False
+                )
+                
+                # Assign role
+                role_name_val = acc["role"].value if hasattr(acc["role"], "value") else str(acc["role"])
+                role = db.query(Role).filter(Role.name == role_name_val).first()
+                if role:
+                    user.roles.append(role)
+                
+                db.add(user)
+                print(f"  👤 Created Dev Account: {acc['email']} (Role: {role_name_val})")
+
+        db.flush() # Ensure users are queryable before the next step
+
+        # Get an admin user for subsequent steps
+        admin_role_name = RoleName.ADMIN.value if hasattr(RoleName.ADMIN, "value") else str(RoleName.ADMIN)
+        admin_user = db.query(User).join(User.roles).filter(Role.name == admin_role_name).first()
+        
         if not admin_user:
-            admin_user = User(
-                id=str(uuid4()),
-                email=admin_email,
-                username="admin",
-                fullname="BNR System Administrator",
-                hashed_password=get_password_hash("Admin@123"),
-                is_active=True,
-                is_superuser=True,
-                email_verified=True,
-                must_change_password=False
-            )
-
-            # Assign ADMIN role
-            admin_role = db.query(Role).filter(Role.name == RoleName.ADMIN.value).first()
-            if admin_role:
-                admin_user.roles.append(admin_role)
-
-            db.add(admin_user)
-            print(f"  👤 Created Default Admin: {admin_email} (Password: Admin@123)")
+            # Fallback if somehow not created above
+            admin_user = db.query(User).filter(User.is_superuser == True).first()
+        
+        if not admin_user:
+             # Critical failure if no admin exists
+             raise ValueError("No admin user found to associate with document types. Seeding aborted.")
 
         # 5. Seed Document Type Definitions
         for doc_data in DOCUMENT_TYPES:
@@ -139,8 +186,9 @@ def seed_data():
                     
                     # Add roles to level
                     roles_list = cast(List, lvl_data["roles"])
-                    for role_enum in roles_list:
-                        role = db.query(Role).filter(Role.name == role_enum.value).first()
+                    for role_item in roles_list:
+                        role_name_str = role_item.value if hasattr(role_item, "value") else str(role_item)
+                        role = db.query(Role).filter(Role.name == role_name_str).first()
                         if role:
                             level.roles.append(role)
                     

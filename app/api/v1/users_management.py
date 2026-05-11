@@ -13,7 +13,7 @@ from app.services.audit_service import audit
 from app.schemas.user_management import (
     UserWithRoles, UserListResponse, UserMeResponse, UserStatusUpdate,
     RoleRead, PermissionRead, PermissionCategoryRead,
-    RoleAssignRequest, PermissionAssignRequest,
+    RoleAssignRequest, PermissionAssignRequest, UserInviteRequest,
 )
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -135,3 +135,40 @@ async def remove_role_from_user(
     request.state.audit_resource_id = user_id
     request.state.audit_old = {"role_id": role_id}
     return {"detail": "Role removed successfully"}
+@router.post("/invite", status_code=status.HTTP_201_CREATED)
+@audit(action="USER_INVITE", resource="user")
+async def invite_user(
+    invite_data: UserInviteRequest,
+    request: Request,
+    current_user: User = Depends(require_permission(Permission.USERS_CREATE)),
+    db: Session = Depends(get_db),
+):
+    try:
+        user = UserService(db).invite_user(
+            email=invite_data.email,
+            fullname=invite_data.fullname,
+            role_id=str(invite_data.role_id)
+        )
+        request.state.audit_resource_id = str(user.id)
+        request.state.audit_new = {"email": user.email, "role_id": str(invite_data.role_id)}
+        
+        return {"detail": "Invitation sent successfully", "user_id": str(user.id)}
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to send invitation: {str(e)}")
+
+@router.post("/{user_id}/re-invite", status_code=status.HTTP_200_OK)
+@audit(action="USER_RE_INVITE", resource="user")
+async def re_invite_user(
+    user_id: str,
+    request: Request,
+    current_user: User = Depends(require_permission(Permission.USERS_CREATE)),
+    db: Session = Depends(get_db),
+):
+    success = UserService(db).re_invite_user(user_id)
+    if not success:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    
+    request.state.audit_resource_id = user_id
+    return {"detail": "Invitation resent successfully"}

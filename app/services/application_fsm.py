@@ -17,7 +17,6 @@ class ApplicationFSM:
         self.current_user = current_user
 
     def _record_history(self, to_status: ApplicationStatus, notes: str | None = None):
-        print(f"DEBUG: Recording history: {self.application.status} -> {to_status}")
         self.db.add(
             ApplicationStateHistory(
                 application_id=self.application.id,
@@ -82,8 +81,18 @@ class ApplicationFSM:
         self.application.submitted_at = datetime.now(timezone.utc)  # type: ignore
 
     def approve(self, notes: str | None = None):
-        if self.application.status not in (ApplicationStatus.SUBMITTED, ApplicationStatus.UNDER_REVIEW):
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Application is not in a reviewable state")
+        if self.application.status != ApplicationStatus.REVIEWED:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, 
+                "Application must be in REVIEWED state (review completed) before approval"
+            )
+
+        # Enforcement: Reviewer cannot be the Approver
+        if self.current_user.id == self.application.reviewed_by:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "Enforcement Rule: The reviewer cannot be the decision maker for the same application."
+            )
 
         level = self._get_current_level()
 
@@ -108,12 +117,6 @@ class ApplicationFSM:
             )
         )
 
-        if self.application.reviewed_by is None:
-            self.application.reviewed_by = self.current_user.id  # type: ignore
-
-        if self.application.status == ApplicationStatus.SUBMITTED:
-            self.application.status = ApplicationStatus.UNDER_REVIEW  # type: ignore
-
         if self._level_fully_approved(level):
             if self._is_final_level(level):
                 self._record_history(ApplicationStatus.APPROVED, notes)
@@ -125,14 +128,21 @@ class ApplicationFSM:
 
 
     def reject(self, notes: str | None = None):
+        if self.application.status not in (ApplicationStatus.UNDER_REVIEW, ApplicationStatus.REVIEWED):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Application is not in a rejectable state")
+
         level = self._get_current_level()
         if not self._user_can_act(level):
             raise HTTPException(status.HTTP_403_FORBIDDEN, "You are not authorized to reject at this level")
 
         self._record_history(ApplicationStatus.REJECTED, notes)
         self.application.status = ApplicationStatus.REJECTED  # type: ignore
+        self.application.approved_by = self.current_user.id  # type: ignore
 
     def request_information(self, notes: str | None = None):
+        if self.application.status != ApplicationStatus.UNDER_REVIEW:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Information can only be requested during review")
+            
         level = self._get_current_level()
         if not self._user_can_act(level):
             raise HTTPException(status.HTTP_403_FORBIDDEN, "You are not authorized at this level")
@@ -148,3 +158,30 @@ class ApplicationFSM:
 
         self._record_history(ApplicationStatus.SUBMITTED, notes)
         self.application.status = ApplicationStatus.SUBMITTED  # type: ignore
+        # Reset reviewer so a new one can start review if needed, 
+        # though usually it stays with the same one. 
+        # The image shows "awaiting assignment" in SUBMITTED.
+        self.application.reviewed_by = None  # type: ignore
+
+    def start_review(self, notes: str | None = None):
+        if self.application.status != ApplicationStatus.SUBMITTED:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Application is not in SUBMITTED state")
+        
+        # Check if user has permission to review (using level 1 roles as proxy or global permission)
+        level = self._get_current_level()
+        if not self._user_can_act(level):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "You are not authorized to start review")
+
+        self._record_history(ApplicationStatus.UNDER_REVIEW, notes)
+        self.application.status = ApplicationStatus.UNDER_REVIEW  # type: ignore
+        self.application.reviewed_by = self.current_user.id  # type: ignore
+
+    def complete_review(self, notes: str | None = None):
+        if self.application.status != ApplicationStatus.UNDER_REVIEW:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Application is not in UNDER_REVIEW state")
+        
+        if self.application.reviewed_by != self.current_user.id:
+             raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the assigned reviewer can complete the review")
+
+        self._record_history(ApplicationStatus.REVIEWED, notes)
+        self.application.status = ApplicationStatus.REVIEWED  # type: ignore

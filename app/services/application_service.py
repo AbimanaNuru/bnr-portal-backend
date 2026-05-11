@@ -85,8 +85,11 @@ class ApplicationService:
             "reject": fsm.reject,
             "request_information": fsm.request_information,
             "resubmit": fsm.resubmit,
+            "start_review": fsm.start_review,
+            "complete_review": fsm.complete_review,
         }
-        handler = dispatch.get(action)
+        action_lower = action.lower()
+        handler = dispatch.get(action_lower)
         if not handler:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Unknown action: {action}")
 

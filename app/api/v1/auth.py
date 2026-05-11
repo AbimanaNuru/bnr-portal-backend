@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, status, HTTPException, Request
 from sqlalchemy.orm import Session
-from typing import Annotated, Union, Any
-from uuid import UUID
+from typing import Union
 
 from app.db.session import get_db
 from app.core.security.dependencies import get_current_active_user, require_permission
@@ -22,7 +21,8 @@ from app.schemas.auth import (
     OTPVerify,
     OTPResend
 )
-from app.core.security.security import create_access_token, create_refresh_token
+from app.core.security.security import create_access_token, create_refresh_token, SECRET_KEY, ALGORITHM
+from jose import jwt, JWTError
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -121,21 +121,28 @@ def refresh_token(
     payload: RefreshToken,
     db: Session = Depends(get_db)
 ):
-    # Basic refresh logic - in production use a more robust version with JWT decoding
-    # For now, keeping it simple as it was in the original code
-    from jose import jwt, JWTError
-    from app.core.security.security import SECRET_KEY, ALGORITHM
-
     try:
         payload_data = jwt.decode(payload.refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        
         if payload_data.get("type") != "refresh":
-            raise HTTPException(status_code=403, detail="Invalid token type")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, 
+                detail="Invalid token type"
+            )
 
         user_id = payload_data.get("sub")
-        db_user: User | None = db.query(User).filter(User.id == user_id).first()
-
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, 
+                detail="Invalid token payload"
+            )
+            
+        db_user = db.query(User).filter(User.id == user_id).first()
         if not db_user or not db_user.is_active:
-            raise HTTPException(status_code=403, detail="User not found or inactive")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, 
+                detail="User not found or inactive"
+            )
 
         active_role = db_user.roles[0].name if db_user.roles else "USER"
         roles = [r.name for r in db_user.roles]
@@ -159,4 +166,7 @@ def refresh_token(
             detail="Token refreshed successfully"
         )
     except JWTError:
-        raise HTTPException(status_code=403, detail="Could not validate refresh token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Could not validate refresh token"
+        )

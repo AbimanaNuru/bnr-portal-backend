@@ -117,3 +117,8 @@ class RoleAssignRequest(BaseModel):
 
 class PermissionAssignRequest(BaseModel):
     permission_id: UUID
+
+class UserInviteRequest(BaseModel):
+    email: EmailStr
+    fullname: str
+    role_id: UUID
