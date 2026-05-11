@@ -66,13 +66,37 @@ def test_approve_single_level(db, application, staff_user, workflow, applicant_u
     db.refresh(application)
     
     initial_version = application.version
-    fsm = ApplicationFSM(application, db, staff_user)
-    fsm.approve(notes="Approved by staff")
+    
+    # 1. First staff user reviews
+    fsm_review = ApplicationFSM(application, db, staff_user)
+    fsm_review.start_review()
+    fsm_review.complete_review()
+    db.commit()
+    
+    # 2. Second staff user approves (Four-Eyes Principle)
+    import uuid
+    from app.models.user import User, Role
+    uid = str(uuid.uuid4())[:8]
+    approver_role = Role(name=f"APPROVER_{uid}")
+    approver = User(
+        email=f"approver_{uid}@example.com",
+        username=f"approver_{uid}",
+        hashed_password="hashed_password",
+        fullname="Approver User",
+        roles=[approver_role]
+    )
+    db.add_all([approver_role, approver])
+    # Also give the approver the roles required by the level
+    approver.roles.extend(level.roles)
+    db.commit()
+    
+    fsm_approve = ApplicationFSM(application, db, approver)
+    fsm_approve.approve(notes="Approved by different staff")
     db.commit()
     db.refresh(application)
     
     assert application.status == ApplicationStatus.APPROVED
-    assert application.approved_by == staff_user.id
+    assert application.approved_by == approver.id
     assert application.version > initial_version
 
 def test_reject_application(db, application, staff_user, workflow, applicant_user):
@@ -90,10 +114,32 @@ def test_reject_application(db, application, staff_user, workflow, applicant_use
     fsm_sub.submit()
     db.commit()
     
-    fsm = ApplicationFSM(application, db, staff_user)
-    fsm.reject(notes="Rejected due to missing info")
+    # 1. First staff user reviews
+    fsm_review = ApplicationFSM(application, db, staff_user)
+    fsm_review.start_review()
+    db.commit()
+    
+    # 2. Second staff user rejects (Four-Eyes Principle)
+    import uuid
+    from app.models.user import User, Role
+    uid = str(uuid.uuid4())[:8]
+    rejecter_role = Role(name=f"REJECTER_{uid}")
+    rejecter = User(
+        email=f"rejecter_{uid}@example.com",
+        username=f"rejecter_{uid}",
+        hashed_password="hashed_password",
+        fullname="Rejecter User",
+        roles=[rejecter_role]
+    )
+    db.add_all([rejecter_role, rejecter])
+    rejecter.roles.extend(level.roles)
+    db.commit()
+    
+    fsm_reject = ApplicationFSM(application, db, rejecter)
+    fsm_reject.reject(notes="Rejected due to missing info")
     db.commit()
     db.refresh(application)
     
     assert application.status == ApplicationStatus.REJECTED
+    assert application.approved_by == rejecter.id
     assert application.version > 0

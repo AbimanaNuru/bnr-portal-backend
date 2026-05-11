@@ -58,13 +58,13 @@ DATABASE_URL=postgresql+psycopg://postgres:password@localhost:5432/bnr-portal
 FRONTEND_URL=http://localhost:3000
 
 # Security
-SECRET_KEY=09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7
+SECRET_KEY=generate-a-long-random-hex-string
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 REFRESH_TOKEN_EXPIRE_DAYS=7
 
 # Email (Resend)
-RESEND_API_KEY=re_M9tEex3k_KTCqJ3xxoRxsCWdtXKMEbm86
+RESEND_API_KEY= You can find key in design document
 FROM_EMAIL=buildwithnuru@buildwithnuru.com
 
 # Timezone
@@ -89,14 +89,27 @@ The API documentation will be available at `http://localhost:8000/docs`.
 ---
 
 ## 🧪 Testing
-Run the comprehensive test suite to verify security and workflow logic:
+
+Run the comprehensive test suite to verify security, concurrency, and workflow logic. All tests are designed for a high-integrity environment.
+
 ```bash
-pytest tests/unit
+# Run all tests with verbose output
+pytest tests/ -v
+
+# Specific verification paths:
+pytest tests/test_state_machine.py     # Valid/invalid transitions + edge cases
+pytest tests/test_rbac_enforcement.py  # RBAC boundary tests per role
+pytest tests/test_four_eyes.py         # Four-Eyes principle enforcement
+pytest tests/test_concurrency.py       # Optimistic locking (simultaneous writers)
 ```
 
 ---
 
 ## 🛡️ Security & Compliance
-- **Regulatory Standards**: Designed to meet strict financial institution compliance requirements.
-- **Audit Trail**: Every critical action is recorded with user metadata, IP, and timestamp.
-- **Concurrency**: Version-based optimistic locking prevents race conditions during multi-user approvals.
+
+This implementation is architected for strict financial regulatory compliance:
+
+- **Four-Eyes Principle**: Technically enforced at the service level. A user assigned as a `reviewer` for an application is strictly prohibited from being the final decision-maker (`approver`) for that same application.
+- **Optimistic Concurrency Control**: Uses a `version` column in the database to prevent race conditions. If two staff members attempt to approve the same application simultaneously, the second attempt will be safely rejected with a `StaleDataError`.
+- **Immutable Audit Trail**: Every critical action—including login attempts, state changes, and permission updates—is recorded with a tamper-resistant asynchronous audit logging system.
+- **Data Scoping**: Access to application data is scoped at the API layer. Applicants can only access their own submissions, while authorized staff can access the full registry according to their permission levels.
