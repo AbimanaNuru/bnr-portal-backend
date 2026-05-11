@@ -56,9 +56,22 @@ class WorkflowService:
         update_data = data.model_dump(exclude_unset=True)
 
         if update_data.get("is_active") is True:
+            # Deactivate all others
             self.db.query(ApprovalWorkflow).filter(
                 ApprovalWorkflow.id != workflow_id
             ).update({"is_active": False}, synchronize_session=False)
+            
+            from app.models.application import Application
+            self.db.query(Application).update({"workflow_id": workflow_id}, synchronize_session=False)
+        
+        elif update_data.get("is_active") is False:
+            # Prevent deactivating the ONLY active workflow
+            active_count = self.db.query(ApprovalWorkflow).filter(ApprovalWorkflow.is_active == True).count()
+            if active_count <= 1 and workflow.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot deactivate the only active workflow. Activate another one first."
+                )
 
         for key, value in update_data.items():
             setattr(workflow, key, value)

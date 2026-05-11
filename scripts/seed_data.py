@@ -124,13 +124,13 @@ def seed_data():
                     email_verified=True,
                     must_change_password=False
                 )
-                
+
                 # Assign role
                 role_name_val = acc["role"].value if hasattr(acc["role"], "value") else str(acc["role"])
                 role = db.query(Role).filter(Role.name == role_name_val).first()
                 if role:
                     user.roles.append(role)
-                
+
                 db.add(user)
                 print(f"  👤 Created Dev Account: {acc['email']} (Role: {role_name_val})")
 
@@ -139,11 +139,11 @@ def seed_data():
         # Get an admin user for subsequent steps
         admin_role_name = RoleName.ADMIN.value if hasattr(RoleName.ADMIN, "value") else str(RoleName.ADMIN)
         admin_user = db.query(User).join(User.roles).filter(Role.name == admin_role_name).first()
-        
+
         if not admin_user:
             # Fallback if somehow not created above
             admin_user = db.query(User).filter(User.is_superuser == True).first()
-        
+
         if not admin_user:
              # Critical failure if no admin exists
              raise ValueError("No admin user found to associate with document types. Seeding aborted.")
@@ -163,37 +163,57 @@ def seed_data():
                 print(f"  📄 Created Document Type: {doc_type.name}")
 
         # 6. Seed Approval Workflows and Levels
+        # Deactivate all existing workflows first to ensure only the ones
+        # in the current config are considered "Active"
+        db.query(ApprovalWorkflow).update({ApprovalWorkflow.is_active: False})
+        db.flush()
+
         for wf_data in DEFAULT_WORKFLOWS:
             workflow = db.query(ApprovalWorkflow).filter(ApprovalWorkflow.name == wf_data["name"]).first()
             if not workflow:
                 workflow = ApprovalWorkflow(
                     id=str(uuid4()),
                     name=wf_data["name"],
-                    description=wf_data["description"]
+                    description=wf_data["description"],
+                    is_active=True
                 )
                 db.add(workflow)
                 db.flush()
                 print(f"  ⛓️ Created Workflow: {workflow.name}")
-                
-                for lvl_data in wf_data["levels"]:
+            else:
+                workflow.is_active = True
+                workflow.description = wf_data["description"]
+                print(f"  ⛓️ Updated Workflow (Active): {workflow.name}")
+
+            for lvl_data in wf_data["levels"]:
+                level = db.query(ApprovalLevel).filter(
+                    ApprovalLevel.workflow_id == workflow.id,
+                    ApprovalLevel.level_number == lvl_data["level_number"]
+                ).first()
+
+                if not level:
                     level = ApprovalLevel(
                         id=str(uuid4()),
                         workflow_id=workflow.id,
-                        level_number=lvl_data["level_number"],
-                        name=lvl_data["name"],
-                        required_approvals=lvl_data["required_approvals"]
+                        level_number=cast(int, lvl_data["level_number"]),
+                        name=cast(str, lvl_data["name"]),
+                        required_approvals=cast(int, lvl_data["required_approvals"])
                     )
-                    
-                    # Add roles to level
-                    roles_list = cast(List, lvl_data["roles"])
-                    for role_item in roles_list:
-                        role_name_str = role_item.value if hasattr(role_item, "value") else str(role_item)
-                        role = db.query(Role).filter(Role.name == role_name_str).first()
-                        if role:
-                            level.roles.append(role)
-                    
                     db.add(level)
                     print(f"    🚦 Created Level {level.level_number}: {level.name}")
+                else:
+                    level.name = cast(str, lvl_data["name"])
+                    level.required_approvals = cast(int, lvl_data["required_approvals"])
+                    print(f"    🚦 Updated Level {level.level_number}: {level.name}")
+
+                # Sync roles for the level
+                level.roles = []
+                roles_list = cast(List, lvl_data["roles"])
+                for role_item in roles_list:
+                    role_name_str = role_item.value if hasattr(role_item, "value") else str(role_item)
+                    role = db.query(Role).filter(Role.name == role_name_str).first()
+                    if role:
+                        level.roles.append(role)
 
         db.commit()
         print("✨ Data Seeding Complete!")

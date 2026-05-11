@@ -1,4 +1,3 @@
-import math
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
@@ -20,18 +19,18 @@ class ApplicationService:
         if data.get("declaration_accepted"):
             data["declaration_accepted_at"] = datetime.now(timezone.utc)
 
-        if not data.get("workflow_id"):
-            workflow = (
-                self.db.query(ApprovalWorkflow)
-                .filter(ApprovalWorkflow.is_active == True)
-                .first()
+        # Always use the currently active workflow
+        active_wf = (
+            self.db.query(ApprovalWorkflow)
+            .filter(ApprovalWorkflow.is_active == True)
+            .first()
+        )
+        if not active_wf:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No active workflow configured. Contact an administrator.",
             )
-            if not workflow:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="No active workflow configured. Contact an administrator.",
-                )
-            data["workflow_id"] = workflow.id
+        data["workflow_id"] = active_wf.id
 
         application = Application(applicant_id=applicant.id, **data)
         self.db.add(application)
@@ -84,6 +83,7 @@ class ApplicationService:
             "approve": fsm.approve,
             "reject": fsm.reject,
             "request_information": fsm.request_information,
+            "request_info": fsm.request_information,
             "resubmit": fsm.resubmit,
             "start_review": fsm.start_review,
             "complete_review": fsm.complete_review,
@@ -124,7 +124,7 @@ class ApplicationService:
         return {
             "items": items,
             "total_count": total_count,
-            "total_pages": math.ceil(total_count / page_size) if total_count else 1,
+            "total_pages": (total_count + page_size - 1) // page_size if total_count else 1,
             "current_page": page,
             "page_size": page_size,
         }
@@ -133,4 +133,16 @@ class ApplicationService:
         app = self.db.query(Application).filter(Application.id == application_id).first()
         if not app:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Application not found")
+
+        if not app.workflow or not app.workflow.is_active:
+            active_wf = (
+                self.db.query(ApprovalWorkflow)
+                .filter(ApprovalWorkflow.is_active == True)
+                .first()
+            )
+            if active_wf and app.workflow_id != active_wf.id:
+                app.workflow_id = active_wf.id
+                self.db.commit()
+                self.db.refresh(app)
+
         return app

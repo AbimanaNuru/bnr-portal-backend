@@ -57,3 +57,23 @@ def require_permission(permission_name: str):
             )
         return current_user
     return permission_dependency
+
+def require_any_permission(permission_names: list[str]):
+    """
+    Dependency to check if the user has AT LEAST ONE of the specified permissions.
+    Usage: Depends(require_any_permission([Permission.A, Permission.B]))
+    """
+    def permission_dependency(
+        current_user: User = Depends(get_current_active_user),
+        db: Session = Depends(get_db)
+    ):
+        rbac = RBACService(db)
+        for name in permission_names:
+            if rbac.has_permission_by_name(current_user, name):
+                return current_user
+        
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Permission denied: Requires one of {', '.join(permission_names)}"
+        )
+    return permission_dependency
